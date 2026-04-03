@@ -6,6 +6,6 @@ import org.springframework.web.bind.annotation.*;
 public class HelloService {
     @GetMapping("/")
     public String hello() {
-        return "hello";
+        return "hello test";
     }
 }
