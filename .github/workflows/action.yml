@@ -8,8 +8,9 @@ on:
 
 permissions:
   contents: read
-  security-events: write
   actions: read
+  security-events: write
+  checks: write
 
 jobs:
   build-and-test:
