@@ -27,17 +27,45 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Run Unit and Web Tests
+      - name: Run Checks (Tests, Coverage, Quality)
         run: |
           cd devops_tp1
           chmod +x gradlew
-          ./gradlew test
+          ./gradlew check
 
       - name: Publish Test Results
         uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
         with:
           files: 'devops_tp1/build/test-results/**/*.xml'
+
+      - name: Generate Summaries (Actions Tab)
+        if: always()
+        run: |
+          echo "## Quality & Coverage Reports" >> $GITHUB_STEP_SUMMARY
+          
+          # PMD Summary
+          if [ -f "devops_tp1/build/reports/pmd/main.xml" ]; then
+            pmd_issues=$(grep -c "<violation" devops_tp1/build/reports/pmd/main.xml || echo 0)
+            echo "### PMD Code Quality" >> $GITHUB_STEP_SUMMARY
+            if [ "$pmd_issues" -gt 0 ]; then
+              echo "**$pmd_issues** violations trouvées." >> $GITHUB_STEP_SUMMARY
+            else
+              echo "**0** violation PMD." >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+          
+          # JaCoCo Summary
+          if [ -f "devops_tp1/build/reports/jacoco/test/jacocoTestReport.csv" ]; then
+            echo "### JaCoCo Code Coverage" >> $GITHUB_STEP_SUMMARY
+            awk -F',' 'NR>1 {missed+=$4; covered+=$5} END {
+              total=missed+covered;
+              ratio=(total==0)?0:(covered/total)*100;
+              printf "| Couvertes | Manquées | Total | Pourcentage |\n" > ENVIRON["GITHUB_STEP_SUMMARY"];
+              printf "|---|---|---|---|\n" > ENVIRON["GITHUB_STEP_SUMMARY"];
+              printf "| %d | %d | %d | %.2f%% |\n", covered, missed, total, ratio > ENVIRON["GITHUB_STEP_SUMMARY"];
+            }' devops_tp1/build/reports/jacoco/test/jacocoTestReport.csv
+          fi
 
       - name: Build Docker images
         run: |
