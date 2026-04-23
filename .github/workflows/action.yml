@@ -42,30 +42,80 @@ jobs:
       - name: Generate Summaries (Actions Tab)
         if: always()
         run: |
-          echo "## Quality & Coverage Reports" >> $GITHUB_STEP_SUMMARY
-          
-          # PMD Summary
-          if [ -f "devops_tp1/build/reports/pmd/main.xml" ]; then
-            pmd_issues=$(grep -o "<violation" devops_tp1/build/reports/pmd/main.xml | wc -l || echo 0)
-            echo "### PMD Code Quality" >> $GITHUB_STEP_SUMMARY
-            if [ "$pmd_issues" -gt 0 ]; then
-              echo "**$pmd_issues** violations trouvées." >> $GITHUB_STEP_SUMMARY
-            else
-              echo "**0** violation PMD." >> $GITHUB_STEP_SUMMARY
-            fi
-          fi
-          
-          # JaCoCo Summary
-          if [ -f "devops_tp1/build/reports/jacoco/test/jacocoTestReport.csv" ]; then
-            echo "### JaCoCo Code Coverage" >> $GITHUB_STEP_SUMMARY
-            awk -F',' 'NR>1 {missed+=$4; covered+=$5} END {
-              total=missed+covered;
-              ratio=(total==0)?0:(covered/total)*100;
-              printf "| Couvertes | Manquées | Total | Pourcentage |\n" >> ENVIRON["GITHUB_STEP_SUMMARY"];
-              printf "|---|---|---|---|\n" >> ENVIRON["GITHUB_STEP_SUMMARY"];
-              printf "| %d | %d | %d | %.2f%% |\n", covered, missed, total, ratio >> ENVIRON["GITHUB_STEP_SUMMARY"];
-            }' devops_tp1/build/reports/jacoco/test/jacocoTestReport.csv
-          fi
+          python3 -c '
+          import os, csv, xml.etree.ElementTree as ET
+
+          summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
+          if not summary_file:
+              exit(0)
+
+          with open(summary_file, "a", encoding="utf-8") as f:
+              f.write("## Rapport de Qualité et de Couverture\n\n")
+
+              # PMD
+              pmd_file = "devops_tp1/build/reports/pmd/main.xml"
+              if os.path.exists(pmd_file):
+                  f.write("### Analyse Statique (PMD)\n")
+                  try:
+                      tree = ET.parse(pmd_file)
+                      root = tree.getroot()
+                      violations = []
+                      for file_elem in root.findall(".//{http://pmd.sourceforge.net/report/2.0.0}file") + root.findall(".//file"):
+                          file_name = file_elem.get("name", "").split("devops_tp1")[-1].replace("\\", "/")
+                          for viol in file_elem.findall("{http://pmd.sourceforge.net/report/2.0.0}violation") + file_elem.findall("violation"):
+                              line = viol.get("beginline", "")
+                              msg = viol.text.strip().replace("\n", " ") if viol.text else ""
+                              rule = viol.get("rule", "")
+                              violations.append((file_name, line, rule, msg))
+                      
+                      if violations:
+                          f.write(f"**{len(violations)} violations PMD trouvées** :\n\n")
+                          f.write("| Fichier | Ligne | Règle | Message |\n")
+                          f.write("|---|---|---|---|\n")
+                          for v in violations:
+                              f.write(f"| `{v[0]}` | {v[1]} | {v[2]} | {v[3]} |\n")
+                      else:
+                          f.write("0 violation trouvée.\n")
+                  except Exception as e:
+                      f.write(f"Erreur lors de l\'analyse PMD : {e}\n")
+              
+              f.write("\n")
+
+              # JaCoCo
+              jacoco_file = "devops_tp1/build/reports/jacoco/test/jacocoTestReport.csv"
+              if os.path.exists(jacoco_file):
+                  f.write("### Couverture de Code (JaCoCo)\n")
+                  try:
+                      with open(jacoco_file, "r", encoding="utf-8") as jf:
+                          reader = csv.DictReader(jf)
+                          total_missed = 0
+                          total_covered = 0
+                          class_stats = []
+                          for row in reader:
+                              m = int(row["INSTRUCTION_MISSED"])
+                              c = int(row["INSTRUCTION_COVERED"])
+                              total_missed += m
+                              total_covered += c
+                              total = m + c
+                              if total > 0:
+                                  ratio = (c / total) * 100
+                                  class_stats.append((row["PACKAGE"] + "." + row["CLASS"], c, m, ratio))
+                          
+                          total_instr = total_missed + total_covered
+                          if total_instr > 0:
+                              total_ratio = (total_covered / total_instr) * 100
+                              f.write(f"**Couverture globale : {total_ratio:.2f}%** ({total_covered} / {total_instr} instructions)\n\n")
+                              
+                              f.write("<details><summary>Détails de couverture par classe</summary>\n\n")
+                              f.write("| Classe | Couvertes | Manquées | Couverture |\n")
+                              f.write("|---|---|---|---|\n")
+                              class_stats.sort(key=lambda x: x[3])
+                              for cs in class_stats:
+                                  f.write(f"| `{cs[0]}` | {cs[1]} | {cs[2]} | {cs[3]:.2f}% |\n")
+                              f.write("\n</details>\n")
+                  except Exception as e:
+                      f.write(f"Erreur lors de l\'analyse JaCoCo : {e}\n")
+          '
 
       - name: Build Docker images
         run: |
