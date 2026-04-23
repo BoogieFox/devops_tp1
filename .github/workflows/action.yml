@@ -46,7 +46,7 @@ jobs:
           
           # PMD Summary
           if [ -f "devops_tp1/build/reports/pmd/main.xml" ]; then
-            pmd_issues=$(grep -c "<violation" devops_tp1/build/reports/pmd/main.xml || echo 0)
+            pmd_issues=$(grep -o "<violation" devops_tp1/build/reports/pmd/main.xml | wc -l || echo 0)
             echo "### PMD Code Quality" >> $GITHUB_STEP_SUMMARY
             if [ "$pmd_issues" -gt 0 ]; then
               echo "**$pmd_issues** violations trouvées." >> $GITHUB_STEP_SUMMARY
