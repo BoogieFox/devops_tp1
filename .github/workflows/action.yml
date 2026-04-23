@@ -61,9 +61,9 @@ jobs:
             awk -F',' 'NR>1 {missed+=$4; covered+=$5} END {
               total=missed+covered;
               ratio=(total==0)?0:(covered/total)*100;
-              printf "| Couvertes | Manquées | Total | Pourcentage |\n" > ENVIRON["GITHUB_STEP_SUMMARY"];
-              printf "|---|---|---|---|\n" > ENVIRON["GITHUB_STEP_SUMMARY"];
-              printf "| %d | %d | %d | %.2f%% |\n", covered, missed, total, ratio > ENVIRON["GITHUB_STEP_SUMMARY"];
+              printf "| Couvertes | Manquées | Total | Pourcentage |\n" >> ENVIRON["GITHUB_STEP_SUMMARY"];
+              printf "|---|---|---|---|\n" >> ENVIRON["GITHUB_STEP_SUMMARY"];
+              printf "| %d | %d | %d | %.2f%% |\n", covered, missed, total, ratio >> ENVIRON["GITHUB_STEP_SUMMARY"];
             }' devops_tp1/build/reports/jacoco/test/jacocoTestReport.csv
           fi
 
