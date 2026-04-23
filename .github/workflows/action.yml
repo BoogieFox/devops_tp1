@@ -42,7 +42,7 @@ jobs:
       - name: Generate Summaries (Actions Tab)
         if: always()
         run: |
-          python3 -c '
+          cat << 'EOF' > generate_summary.py
           import os, csv, xml.etree.ElementTree as ET
 
           summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
@@ -77,7 +77,7 @@ jobs:
                       else:
                           f.write("0 violation trouvée.\n")
                   except Exception as e:
-                      f.write(f"Erreur lors de l\'analyse PMD : {e}\n")
+                      f.write(f"Erreur lors de l'analyse PMD : {e}\n")
               
               f.write("\n")
 
@@ -114,8 +114,9 @@ jobs:
                                   f.write(f"| `{cs[0]}` | {cs[1]} | {cs[2]} | {cs[3]:.2f}% |\n")
                               f.write("\n</details>\n")
                   except Exception as e:
-                      f.write(f"Erreur lors de l\'analyse JaCoCo : {e}\n")
-          '
+                      f.write(f"Erreur lors de l'analyse JaCoCo : {e}\n")
+          EOF
+          python3 generate_summary.py
 
       - name: Build Docker images
         run: |
